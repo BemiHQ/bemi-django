@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bemi-django"
+version = "0.0.5"
+authors = [
+  { name="Arjun Lall", email="arjun@bemi.io" },
+]
+description = "Automatic data change tracking for Django"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development",
+    "Topic :: Database",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+]
+dependencies = [
+    "Django>=3.2",
+]
+license = { file = "LICENSE" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["bemi*"]
+
+[tool.setuptools.package-data]
+"bemi" = ["migrations/*.py"]
+
+[project.urls]
+Homepage = "https://github.com/BemiHQ/bemi-django"
+Issues = "https://github.com/BemiHQ/bemi-django/issues"
+Documentation = "https://docs.bemi.io/orms/django"
