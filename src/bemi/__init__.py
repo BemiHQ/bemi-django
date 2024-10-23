@@ -32,11 +32,11 @@ class BemiDBWrapper:
         conn = context["connection"]
         if not isinstance(conn, DatabaseWrapper) or 'postgresql' not in conn.settings_dict['ENGINE']:
             return execute(sql, params, many, context)
-        
+
         bemi_context = bemi_context_var.get(None)
         if bemi_context is None or not re.match(r"(INSERT|UPDATE|DELETE)\s", sql, re.IGNORECASE):
             return execute(sql, params, many, context)
-        
+
         sql = sql.rstrip()
         safe_sql = sql.replace('%', '%%')
         sql_comment = " /*Bemi " + json.dumps({ **bemi_context, 'SQL': safe_sql }) + " Bemi*/"
@@ -44,10 +44,10 @@ class BemiDBWrapper:
             sql = sql[:-1] + sql_comment + ";"
         else:
             sql = sql + sql_comment
-            
+
         return execute(sql, params, many, context)
 
-class Bemi: 
+class Bemi:
     @staticmethod
     def migration_up():
         return """
