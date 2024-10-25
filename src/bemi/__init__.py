@@ -7,6 +7,8 @@ import contextvars
 import json
 import re
 
+MAX_CONTEXT_SIZE = 1000000 # ~1MB
+
 bemi_context_var = contextvars.ContextVar('bemi_context')
 
 def get_bemi_context(request):
@@ -34,12 +36,23 @@ class BemiDBWrapper:
             return execute(sql, params, many, context)
 
         bemi_context = bemi_context_var.get(None)
-        if bemi_context is None or not re.match(r"(INSERT|UPDATE|DELETE)\s", sql, re.IGNORECASE):
+        if not bemi_context:
+            return execute(sql, params, many, context)
+
+        if not isinstance(bemi_context, dict):
+            return execute(sql, params, many, context)
+
+        if not re.match(r"(INSERT|UPDATE|DELETE)\s", sql, re.IGNORECASE):
             return execute(sql, params, many, context)
 
         sql = sql.rstrip()
         safe_sql = sql.replace('%', '%%')
         sql_comment = " /*Bemi " + json.dumps({ **bemi_context, 'SQL': safe_sql }) + " Bemi*/"
+
+        # Context too large
+        if len(sql_comment.encode('utf-8')) > MAX_CONTEXT_SIZE:
+            return execute(sql, params, many, context)
+
         if sql[-1] == ";":
             sql = sql[:-1] + sql_comment + ";"
         else:
