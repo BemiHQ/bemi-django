@@ -70,6 +70,14 @@ Install the Python package
 pip install bemi-django
 ```
 
+Add the `bemi` app to your Django project's `INSTALLED_APPS`
+```py
+INSTALLED_APPS = [
+    # Your other apps
+    'bemi',
+]
+```
+
 Run the migration to add lightweight PostgreSQL triggers for passing application context with all data changes into PostgreSQL's replication log
 ```sh
 python manage.py migrate bemi
@@ -79,12 +87,6 @@ Add the Bemi middleware to your Django project app and add the path to a `get_be
 
 ```py
 # settings.py
-
-INSTALLED_APPS = [
-    # Your other apps
-    'bemi',
-]
-
 MIDDLEWARE = [
     # Your other middlewares
     'bemi.BemiMiddleware',
@@ -95,7 +97,6 @@ BEMI_CONTEXT_FUNCTION = 'your_project.utils.get_bemi_context'
 
 ```py
 # utils.py
-
 def get_bemi_context(request):
     # Return any custom context dict
     return {
@@ -105,10 +106,51 @@ def get_bemi_context(request):
     }
 ```
 
-Make database changes and check how they're stored with your context in a table called `changes` in the destination DB:
+Application context:
+* Is bound to the current execution thread within an HTTP request.
+* Is used only with `INSERT`, `UPDATE`, `DELETE` SQL queries performed via Django. Otherwise, it is a no-op.
+* Is passed directly into PG [Write-Ahead Log](https://www.postgresql.org/docs/current/wal-intro.html) with data changes without affecting the structure of the database and SQL queries.
+
+Application context will automatically include the original SQL query that performed data changes, which is generally useful for troubleshooting purposes.
+
+## Data change tracking
+
+### Local database
+
+To test data change tracking and the Django integration with a locally connected PostgreSQL, you need to set up your local PostgreSQL.
+
+First, make sure your database has `SHOW wal_level;` returning `logical`. Otherwise, you need to run the following SQL command:
+
+```sql
+-- Don't forget to restart your PostgreSQL server after running this command
+ALTER SYSTEM SET wal_level = logical;
+```
+
+To track both the "before" and "after" states on data changes, please run the following SQL command:
+
+```sql
+ALTER TABLE [YOUR_TABLE_NAME] REPLICA IDENTITY FULL;
+```
+
+Then, run a Docker container that connects to your local PostgreSQL database and starts tracking all data changes:
+
+```sh
+docker run \
+  -e DB_HOST=host.docker.internal \
+  -e DB_PORT=5432 \
+  -e DB_NAME=[YOUR_DATABASE] \
+  -e DB_USER=postgres \
+  -e DB_PASSWORD=postgres \
+  public.ecr.aws/bemi/dev:latest
+```
+
+Replace `DB_NAME` with your local database name. Note that `DB_HOST` pointing to `host.docker.internal` allows accessing `127.0.0.1` on your host machine if you run PostgreSQL outside Docker. Customize `DB_USER` and `DB_PASSWORD` with your PostgreSQL credentials if needed.
+
+Now try making some database changes. This will add a new record in the `changes` table within the same local database after a few seconds:
 
 ```
-psql -h [HOSTNAME] -U [USERNAME] -d [DATABASE] -c 'SELECT "primary_key", "table", "operation", "before", "after", "context", "committed_at" FROM changes;'
+psql postgres://postgres:postgres@127.0.0.1:5432/[YOUR_DATABASE] -c \
+  'SELECT "primary_key", "table", "operation", "before", "after", "context", "committed_at" FROM changes;'
 
  primary_key | table | operation |                       before                       |                       after                         |                        context                                                            |      committed_at
 -------------+-------+-----------+----------------------------------------------------+-----------------------------------------------------+-------------------------------------------------------------------------------------------+------------------------
