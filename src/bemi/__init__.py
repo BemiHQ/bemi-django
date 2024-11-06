@@ -47,7 +47,11 @@ class BemiDBWrapper:
 
         sql = sql.rstrip()
         safe_sql = sql.replace('%', '%%')
-        sql_comment = " /*Bemi " + json.dumps({ **bemi_context, 'SQL': safe_sql }) + " Bemi*/"
+
+        json_str = json.dumps({ **bemi_context, 'SQL': safe_sql })
+        json_str = json_str.replace('*/', '* /').replace('/*', '/ *').replace('--', '- -')
+
+        sql_comment = " /*Bemi " + json_str + " Bemi*/"
 
         # Context too large
         if len(sql_comment.encode('utf-8')) > MAX_CONTEXT_SIZE:
