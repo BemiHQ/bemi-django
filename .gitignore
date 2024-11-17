@@ -3,3 +3,4 @@ build/
 dist/
 src/bemi_django.egg-info/
 .pypirc
+**/__pycache__/
