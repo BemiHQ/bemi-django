@@ -1,3 +1,5 @@
+.PHONY: setup install build publish test
+
 setup:
 	python3 -m venv venv
 
@@ -13,4 +15,7 @@ build:
 
 publish:
 	source ./venv/bin/activate && \
-	python -m twine upload dist/*	
+	python -m twine upload dist/*
+
+test:
+	python -m unittest
