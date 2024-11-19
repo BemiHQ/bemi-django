@@ -6,6 +6,8 @@ from django.db.backends.postgresql.base import DatabaseWrapper
 from django.db import connection
 from django.utils.module_loading import import_string
 from django.conf import settings
+from urllib.parse import quote
+import logging
 
 
 MAX_CONTEXT_SIZE = 1000000 # ~1MB
@@ -32,35 +34,36 @@ class BemiMiddleware(MiddlewareMixin):
 
 class BemiDBWrapper:
     def __call__(self, execute, sql, params, many, context):
-        conn = context["connection"]
-        if not isinstance(conn, DatabaseWrapper) or 'postgresql' not in conn.settings_dict['ENGINE']:
+        try:
+            conn = context["connection"]
+            if not isinstance(conn, DatabaseWrapper) or 'postgresql' not in conn.settings_dict['ENGINE']:
+                return execute(sql, params, many, context)
+
+            bemi_context = bemi_context_var.get(None)
+            if not bemi_context:
+                return execute(sql, params, many, context)
+
+            if not isinstance(bemi_context, dict):
+                return execute(sql, params, many, context)
+
+            if not re.match(r"(INSERT|UPDATE|DELETE)\s", sql, re.IGNORECASE):
+                return execute(sql, params, many, context)
+
+            json_str = json.dumps({ **bemi_context, 'SQL': sql })
+            escaped_sql_json = quote(json_str, safe='{},[]:"\'\-/_=()% ')
+            escaped_sql_json = escaped_sql_json.replace('*/', '* /').replace('/*', '/ *').replace('--', '- -').replace('%', '%%')
+
+            sql_comment = " /*Bemi " + escaped_sql_json + " Bemi*/"
+            # Context too large
+            if len(sql_comment.encode('utf-8')) > MAX_CONTEXT_SIZE:
+                return execute(sql, params, many, context)
+
+            striped_sql = sql.rstrip()
+            if sql[-1] == ";":
+                sql_with_comment = striped_sql[:-1] + sql_comment + ";"
+            else:
+                sql_with_comment = striped_sql + sql_comment
+            return execute(sql_with_comment, params, many, context)
+        except Exception as e:
+            logging.exception("An error occurred in BemiDBWrapper while executing SQL: %s. Error: %s", sql, str(e))
             return execute(sql, params, many, context)
-
-        bemi_context = bemi_context_var.get(None)
-        if not bemi_context:
-            return execute(sql, params, many, context)
-
-        if not isinstance(bemi_context, dict):
-            return execute(sql, params, many, context)
-
-        if not re.match(r"(INSERT|UPDATE|DELETE)\s", sql, re.IGNORECASE):
-            return execute(sql, params, many, context)
-
-        sql = sql.rstrip()
-        safe_sql = sql.replace('%', '%%')
-
-        json_str = json.dumps({ **bemi_context, 'SQL': safe_sql })
-        json_str = json_str.replace('*/', '* /').replace('/*', '/ *').replace('--', '- -')
-
-        sql_comment = " /*Bemi " + json_str + " Bemi*/"
-
-        # Context too large
-        if len(sql_comment.encode('utf-8')) > MAX_CONTEXT_SIZE:
-            return execute(sql, params, many, context)
-
-        if sql[-1] == ";":
-            sql = sql[:-1] + sql_comment + ";"
-        else:
-            sql = sql + sql_comment
-
-        return execute(sql, params, many, context)
