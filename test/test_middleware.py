@@ -66,8 +66,9 @@ class TestBemiDBWrapper(SimpleTestCase):
         called_sql = self.execute_mock.call_args[0][0]
         self.assertTrue(called_sql.endswith("Bemi*/;"))
 
-    def test_sql_comment_added(self):
+    def test_sql_comment_added_after_striping(self):
         bemi_context_var.set({'user': 'test_user'})
+        self.sql = "INSERT INTO table_name (column1) VALUES ('value1'); "
         self.middleware(self.execute_mock, self.sql, self.params, self.many, self.context)
         called_sql = self.execute_mock.call_args[0][0]
         self.assertTrue(called_sql.endswith("Bemi*/;"))

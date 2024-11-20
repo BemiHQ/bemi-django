@@ -27,8 +27,12 @@ class BemiMiddleware(MiddlewareMixin):
         super().__init__(get_response)
 
     def __call__(self, request):
-        context = get_bemi_context(request)
-        bemi_context_var.set(context)
+        try:
+            context = get_bemi_context(request)
+            bemi_context_var.set(context)
+        except Exception as e:
+            logging.exception(f"Error while getting Bemi context: {e}")
+            bemi_context_var.set({})
         with connection.execute_wrapper(BemiDBWrapper()):
             return self.get_response(request)
 
@@ -59,11 +63,11 @@ class BemiDBWrapper:
                 return execute(sql, params, many, context)
 
             striped_sql = sql.rstrip()
-            if sql[-1] == ";":
+            if striped_sql[-1] == ";":
                 sql_with_comment = striped_sql[:-1] + sql_comment + ";"
             else:
                 sql_with_comment = striped_sql + sql_comment
             return execute(sql_with_comment, params, many, context)
         except Exception as e:
-            logging.exception("An error occurred in BemiDBWrapper while executing SQL: %s. Error: %s", sql, str(e))
+            logging.exception(f"Error in BemiDBWrapper while executing SQL: {sql}. Error: {str(e)}")
             return execute(sql, params, many, context)
