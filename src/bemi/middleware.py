@@ -1,14 +1,15 @@
 import contextvars
 import json
 import re
+import logging
 from django.utils.deprecation import MiddlewareMixin
 from django.db.backends.postgresql.base import DatabaseWrapper
 from django.db import connection
 from django.utils.module_loading import import_string
 from django.conf import settings
 from urllib.parse import quote
-import logging
 
+logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_SIZE = 1000000 # ~1MB
 
@@ -31,7 +32,7 @@ class BemiMiddleware(MiddlewareMixin):
             context = get_bemi_context(request)
             bemi_context_var.set(context)
         except Exception as e:
-            logging.exception(f"Error while getting Bemi context: {e}")
+            logger.exception(f"Error while getting Bemi context: {e}")
             bemi_context_var.set({})
         with connection.execute_wrapper(BemiDBWrapper()):
             return self.get_response(request)
@@ -69,5 +70,5 @@ class BemiDBWrapper:
                 sql_with_comment = striped_sql + sql_comment
             return execute(sql_with_comment, params, many, context)
         except Exception as e:
-            logging.exception(f"Error in BemiDBWrapper while executing SQL: {sql}. Error: {str(e)}")
+            logger.exception(f"Error in BemiDBWrapper while executing SQL: {sql}. Error: {str(e)}")
             return execute(sql, params, many, context)
